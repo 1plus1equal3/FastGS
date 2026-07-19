@@ -73,7 +73,7 @@ def _ssim(img1, img2, window, window_size, channel, size_average=True):
 
 _loss_fns = {}
 
-def lpips_loss(network_output, gt, net_type="vgg"):
+def lpips_loss(network_output, gt, net_type="vgg", downsample=True):
     if net_type not in _loss_fns:
         _loss_fns[net_type] = lpips
     loss_fn = _loss_fns[net_type]
@@ -88,5 +88,19 @@ def lpips_loss(network_output, gt, net_type="vgg"):
         gt = gt.clamp(0.0, 1.0)
         network_output = network_output * 2.0 - 1.0
         gt = gt * 2.0 - 1.0
+    # Downsample for LPIPS
+    if downsample:
+        network_output = F.interpolate(
+            network_output,
+            size=(224, 224),
+            mode="bilinear",
+            align_corners=False,
+        )
+        gt = F.interpolate(
+            gt,
+            size=(224, 224),
+            mode="bilinear",
+            align_corners=False,
+        )
     return loss_fn(network_output, gt, net_type=net_type).mean()
 
