@@ -75,7 +75,7 @@ _loss_fns = {}
 
 def lpips_loss(network_output, gt, net_type="vgg"):
     if net_type not in _loss_fns:
-        _loss_fns[net_type] = lpips.LPIPS(net=net_type).to(network_output.device)
+        _loss_fns[net_type] = lpips
     loss_fn = _loss_fns[net_type]
     mn = min(network_output.min().item(), gt.min().item())
     mx = max(network_output.max().item(), gt.max().item())
@@ -91,5 +91,5 @@ def lpips_loss(network_output, gt, net_type="vgg"):
             f"LPIPS expects inputs in [0,1] or [-1,1], "
             f"but got range [{mn:.3f}, {mx:.3f}]."
         )
-    return loss_fn(network_output, gt).mean()
+    return loss_fn(network_output, gt, net_type=net_type).mean()
 
