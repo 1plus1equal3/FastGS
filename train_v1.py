@@ -106,6 +106,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
         ssim_value = fast_ssim(image.unsqueeze(0), gt_image.unsqueeze(0))
         llpips_value = lpips_loss(image.unsqueeze(0), gt_image.unsqueeze(0), net_type='vgg')
         loss = 0.85 * Ll1 + 0.1 * (1.0 - ssim_value) + 0.05 * llpips_value
+        loss.backward()
 
         iter_end.record()
 
