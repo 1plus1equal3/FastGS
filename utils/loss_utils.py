@@ -77,19 +77,16 @@ def lpips_loss(network_output, gt, net_type="vgg"):
     if net_type not in _loss_fns:
         _loss_fns[net_type] = lpips
     loss_fn = _loss_fns[net_type]
-    mn = min(network_output.min().item(), gt.min().item())
-    mx = max(network_output.max().item(), gt.max().item())
-    # [0,1] -> [-1,1]
-    if 0.0 <= mn and mx <= 1.0:
-        network_output = network_output * 2.0 - 1.0
-        gt = gt * 2.0 - 1.0
-    # Already [-1,1]
-    elif -1.0 <= mn and mx <= 1.0:
+    # If already in [-1,1], leave as is.
+    if network_output.min() >= -1.0 and network_output.max() <= 1.0 \
+       and gt.min() >= -1.0 and gt.max() <= 1.0 \
+       and (network_output.min() < 0 or gt.min() < 0):
         pass
     else:
-        raise ValueError(
-            f"LPIPS expects inputs in [0,1] or [-1,1], "
-            f"but got range [{mn:.3f}, {mx:.3f}]."
-        )
+        # Assume [0,1] with possible overshoot and clamp.
+        network_output = network_output.clamp(0.0, 1.0)
+        gt = gt.clamp(0.0, 1.0)
+        network_output = network_output * 2.0 - 1.0
+        gt = gt * 2.0 - 1.0
     return loss_fn(network_output, gt, net_type=net_type).mean()
 
