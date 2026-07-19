@@ -13,9 +13,13 @@ import torch
 import torch.nn.functional as F
 from torch.autograd import Variable
 from math import exp
+from lpipsPyTorch import lpips
 
 C1 = 0.01 ** 2
 C2 = 0.03 ** 2
+
+def charbonnier_loss(network_output, gt, eps=1e-6):
+    return torch.sqrt((network_output - gt) ** 2 + eps ** 2).mean()
 
 def l1_loss(network_output, gt):
     return torch.abs((network_output - gt)).mean()
@@ -64,4 +68,28 @@ def _ssim(img1, img2, window, window_size, channel, size_average=True):
         return ssim_map.mean()
     else:
         return ssim_map.mean(1).mean(1).mean(1)
+    
+
+
+_loss_fns = {}
+
+def lpips_loss(network_output, gt, net_type="vgg"):
+    if net_type not in _loss_fns:
+        _loss_fns[net_type] = lpips.LPIPS(net=net_type).to(network_output.device)
+    loss_fn = _loss_fns[net_type]
+    mn = min(network_output.min().item(), gt.min().item())
+    mx = max(network_output.max().item(), gt.max().item())
+    # [0,1] -> [-1,1]
+    if 0.0 <= mn and mx <= 1.0:
+        network_output = network_output * 2.0 - 1.0
+        gt = gt * 2.0 - 1.0
+    # Already [-1,1]
+    elif -1.0 <= mn and mx <= 1.0:
+        pass
+    else:
+        raise ValueError(
+            f"LPIPS expects inputs in [0,1] or [-1,1], "
+            f"but got range [{mn:.3f}, {mx:.3f}]."
+        )
+    return loss_fn(network_output, gt).mean()
 
