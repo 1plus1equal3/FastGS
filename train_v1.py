@@ -108,6 +108,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
         perceptual_loss = vgg_loss(image.unsqueeze(0), gt_image.unsqueeze(0))
         loss = 0.85 * Ll1 + 0.1 * (1.0 - ssim_value) + 0.05 * perceptual_loss
         loss.backward()
+        del perceptual_loss
 
         iter_end.record()
 

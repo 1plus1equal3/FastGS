@@ -127,9 +127,7 @@ class VGG19PerceptualLoss(nn.Module):
         self.blocks = nn.ModuleList([
             vgg[0:4],    # relu1_2
             vgg[4:9],    # relu2_2
-            vgg[9:18],   # relu3_4
-            vgg[18:27],  # relu4_4
-            vgg[27:36],  # relu5_4
+            vgg[9:18]    # relu3_4
         ])
         for block in self.blocks:
             for p in block.parameters():
