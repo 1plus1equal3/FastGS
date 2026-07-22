@@ -10,7 +10,9 @@
 #
 
 import torch
+import torch.nn as nn
 import torch.nn.functional as F
+import torchvision.models as models
 from torch.autograd import Variable
 from math import exp
 from lpipsPyTorch import lpips
@@ -103,4 +105,87 @@ def lpips_loss(network_output, gt, net_type="vgg", downsample=True):
             align_corners=False,
         )
     return loss_fn(network_output, gt, net_type=net_type).mean()
+
+class VGG19PerceptualLoss(nn.Module):
+    """
+    VGG-19 perceptual loss.
+
+    resize options:
+        False      -> no resize
+        int > 1    -> downsample by this factor (e.g. 4)
+        (H, W)     -> resize to exact size
+    """
+
+    def __init__(
+        self,
+        layer_weights=(1.0, 1.0, 1.0, 1.0, 1.0),
+        resize=False,
+    ):
+        super().__init__()
+        weights = models.VGG19_Weights.DEFAULT
+        vgg = models.vgg19(weights=weights).features.eval()
+        self.blocks = nn.ModuleList([
+            vgg[0:4],    # relu1_2
+            vgg[4:9],    # relu2_2
+            vgg[9:18],   # relu3_4
+            vgg[18:27],  # relu4_4
+            vgg[27:36],  # relu5_4
+        ])
+        for block in self.blocks:
+            for p in block.parameters():
+                p.requires_grad = False
+        self.layer_weights = layer_weights
+        self.resize = resize
+        self.register_buffer(
+            "mean",
+            torch.tensor([0.485, 0.456, 0.406]).view(1, 3, 1, 1),
+        )
+        self.register_buffer(
+            "std",
+            torch.tensor([0.229, 0.224, 0.225]).view(1, 3, 1, 1),
+        )
+
+    def _resize(self, img):
+        if self.resize is False:
+            return img
+        # resize to exact resolution
+        if isinstance(self.resize, (tuple, list)):
+            return F.interpolate(
+                img,
+                size=self.resize,
+                mode="bilinear",
+                align_corners=False,
+            )
+        # downsample by scale factor
+        if isinstance(self.resize, int):
+            if self.resize <= 1:
+                return img
+            h, w = img.shape[-2:]
+            new_h = max(1, h // self.resize)
+            new_w = max(1, w // self.resize)
+            return F.interpolate(
+                img,
+                size=(new_h, new_w),
+                mode="bilinear",
+                align_corners=False,
+            )
+        raise ValueError("resize must be False, int, or (H, W)")
+
+    def forward(self, pred, target):
+        if pred.dim() == 3:
+            pred = pred.unsqueeze(0)
+            target = target.unsqueeze(0)
+        pred = self._resize(pred)
+        target = self._resize(target)
+
+        pred = (pred - self.mean) / self.std
+        target = (target - self.mean) / self.std
+        loss = 0.0
+        x = pred
+        y = target
+        for weight, block in zip(self.layer_weights, self.blocks):
+            x = block(x)
+            y = block(y)
+            loss += weight * F.l1_loss(x, y)
+        return loss
 

@@ -14,7 +14,7 @@ import numpy as np
 import os, random, time
 from random import randint
 from lpipsPyTorch import lpips
-from utils.loss_utils import l1_loss, charbonnier_loss, lpips_loss
+from utils.loss_utils import l1_loss, charbonnier_loss, lpips_loss, VGG19PerceptualLoss
 from fused_ssim import fused_ssim as fast_ssim
 from gaussian_renderer import render_fastgs, network_gui_ws
 import sys
@@ -46,6 +46,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
 
     bg_color = [1, 1, 1] if dataset.white_background else [0, 0, 0]
     background = torch.tensor(bg_color, dtype=torch.float32, device="cuda")
+    vgg_loss = VGG19PerceptualLoss(resize=4).cuda()
 
     iter_start = torch.cuda.Event(enable_timing = True)
     iter_end = torch.cuda.Event(enable_timing = True)
@@ -104,8 +105,8 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
         # loss.backward()
         Ll1 = charbonnier_loss(image, gt_image)
         ssim_value = fast_ssim(image.unsqueeze(0), gt_image.unsqueeze(0))
-        llpips_value = lpips_loss(image.unsqueeze(0), gt_image.unsqueeze(0), net_type='vgg')
-        loss = 0.85 * Ll1 + 0.1 * (1.0 - ssim_value) + 0.05 * llpips_value
+        perceptual_loss = vgg_loss(image.unsqueeze(0), gt_image.unsqueeze(0))
+        loss = 0.85 * Ll1 + 0.1 * (1.0 - ssim_value) + 0.05 * perceptual_loss
         loss.backward()
 
         iter_end.record()
